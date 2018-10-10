@@ -134,6 +134,19 @@ public class JmxTransformer implements WatchedCallback {
 			return;
 		}
 
+		Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+			@Override
+			@SuppressFBWarnings(value = "DM_EXIT", justification = "To avoid leaving jmxtrans in an inconsistent state, terminate the VM when an uncaught exception causes a thread to unexpectedly terminate")
+			public void uncaughtException(Thread thread, Throwable throwable) {
+				try {
+					log.error("Exception in thread \"" + thread.getName() + "\"", throwable);
+				}
+				finally {
+					System.exit(1);
+				}
+			}
+		});
+
 		ClassLoaderEnricher enricher = new ClassLoaderEnricher();
 		for (File jar : configuration.getAdditionalJars()) {
 			enricher.add(jar);
