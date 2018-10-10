@@ -492,6 +492,22 @@ public class JmxTransformer implements WatchedCallback {
 		}
 	}
 
+	private void uninitializeExecutors() throws MalformedObjectNameException {
+		this.uninitializeExecutors(queryExecutorRepository);
+		this.uninitializeExecutors(resultExecutorRepository);
+	}
+
+	private void uninitializeExecutors(ExecutorRepository executorRepository) {
+		executorRepository.clear();
+	}
+
+	private void restartSystem() throws Exception {
+		this.deleteAllJobs();
+		this.unregisterMBeans();
+		this.uninitializeExecutors();
+		this.startupSystem();
+	}
+
 	/**
 	 * If getJsonFile() is a file, then that is all we load. Otherwise, look in
 	 * the jsonDir for files.
@@ -538,8 +554,7 @@ public class JmxTransformer implements WatchedCallback {
 		if (this.isProcessConfigFile(file)) {
 			Thread.sleep(1000);
 			log.info("Configuration file modified: " + file);
-			this.deleteAllJobs();
-			this.startupSystem();
+			this.restartSystem();
 		}
 	}
 
@@ -547,8 +562,7 @@ public class JmxTransformer implements WatchedCallback {
 	public void fileDeleted(File file) throws Exception {
 		log.info("Configuration file deleted: " + file);
 		Thread.sleep(1000);
-		this.deleteAllJobs();
-		this.startupSystem();
+		this.restartSystem();
 	}
 
 	@Override
@@ -556,8 +570,7 @@ public class JmxTransformer implements WatchedCallback {
 		if (this.isProcessConfigFile(file)) {
 			Thread.sleep(1000);
 			log.info("Configuration file added: " + file);
-			this.deleteAllJobs();
-			this.startupSystem();
+			this.restartSystem();
 		}
 	}
 
