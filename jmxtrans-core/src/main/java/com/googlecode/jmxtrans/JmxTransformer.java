@@ -67,8 +67,12 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -101,6 +105,8 @@ public class JmxTransformer implements WatchedCallback {
 
 	private Thread shutdownHook = new ShutdownHook();
 
+	private final ScheduledExecutorService reloadScheduler = Executors.newScheduledThreadPool(1);
+
 	private volatile boolean isRunning = false;
 	@Nonnull private ExecutorRepository queryExecutorRepository;
 	@Nonnull private ExecutorRepository resultExecutorRepository;
@@ -109,6 +115,7 @@ public class JmxTransformer implements WatchedCallback {
 	@Nullable private ManagedJmxTransformerProcess jmxTransformerProcessMBean;
 	@Nullable private ImmutableList<ManagedThreadPoolExecutor> queryExecutorMBeans;
 	@Nullable private ImmutableList<ManagedThreadPoolExecutor> resultExecutorMBeans;
+	private ScheduledFuture<?> reloadScheduledFuture;
 
 	@Inject
 	public JmxTransformer(
@@ -572,8 +579,26 @@ public class JmxTransformer implements WatchedCallback {
 		if (this.isProcessConfigFile(file)) {
 			Thread.sleep(1000);
 			log.info("Configuration file " + event + ": " + file);
-			this.restartSystem();
+			this.scheduleReload();
 		}
+	}
+
+	private void scheduleReload() {
+		if(this.reloadScheduledFuture != null) {
+			this.reloadScheduledFuture.cancel(false);
+			this.reloadScheduledFuture = null;
+		}
+
+		this.reloadScheduledFuture = reloadScheduler.schedule(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					restartSystem();
+				} catch(Exception e) {
+					throw new RuntimeException(e);
+				}
+			}
+		}, 1, TimeUnit.SECONDS);
 	}
 
 	@Override
